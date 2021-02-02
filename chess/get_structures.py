@@ -56,22 +56,32 @@ def clipped_zoom(img, zoom_factor, **kwargs):
     return out
 
 
-def get_info_feature(labels, submatrix, outfile, position, area, reg):
+def get_info_feature(labels, submatrix, outfile, position, region, area, reg, bin_size):
     for region in regionprops(labels):
-        minr, minc, maxr, maxc = region.bbox
         if region.area > area:
-            bx = (minc, maxc, maxc, minc, minc)
-            by = (minr, minr, maxr, maxr, minr)
-            y_min, y_max = np.min(by), np.max(by)
-            x_min, x_max = np.min(bx), np.max(bx)
-            submat = submatrix[y_min:y_max, x_min:x_max]
+            minr, minc, maxr, maxc = region.bbox
+            # calculate genomic coordinates
+            row_coords = (region.start + (bin_size * minr), region.start + (bin_size * maxr))
+            col_coords = (region.start + (bin_size * minc), region.start + (bin_size * maxc))
+            chrom = region.chromosome
+            row_region = fanc.GenomicRegion(chromosome=chrom, start=row_coords[0], end=row_coords[1])
+            col_region = fanc.GenomicRegion(chromosome=chrom, start=col_coords[0], end=col_coords[1])
+            # sort genomic coordinates to help with removing duplicates later
+            if row_region.start < col_region.start:
+                row_region, col_region = row_region, col_region
+            else:
+                row_region, col_region = col_region, row_region
+
+            submat = submatrix[minr:maxr, minc:maxc]
             flat_mat = list(submat.flatten())
             flat_mat.insert(0, reg)
             flat_mat.insert(1, position)
-            flat_mat.insert(2, x_min)
-            flat_mat.insert(3, x_max)
-            flat_mat.insert(4, y_min)
-            flat_mat.insert(5, y_max)
+            flat_mat.insert(2, minc)
+            flat_mat.insert(3, maxc)
+            flat_mat.insert(4, minr)
+            flat_mat.insert(5, maxr)
+            flat_mat.insert(6, row_region.to_string())
+            flat_mat.insert(7, col_region.to_string())
             outfile.write(','.join(map(str, flat_mat)) + '\n')
             position += 1
     return position
@@ -87,13 +97,14 @@ def extract_structures(
     windowsize,
     sigma_spatial,
     size_medianfilter,
-    closing_square
+    closing_square,
+    min_area=5
 ):
     pos_query = 0
     pos_reference = 0
 
-    w1 = open(path.join(output, 'gained_features.tsv'), '+w')
-    w2 = open(path.join(output, 'lost_features.tsv'), '+w')
+    gained_features_file = open(path.join(output, 'gained_features.csv'), '+w')
+    lost_features_file = open(path.join(output, 'lost_features.csv'), '+w')
 
     for pair_ix, reference_region, query_region in pairs:
         reference, ref_rs = sub_matrix_from_edges_dict(
@@ -106,7 +117,7 @@ def extract_structures(
             query_regions,
             query_region,
             default_weight=0.)
-        area = int((5 * np.shape(query)[0]) / 100)
+        area = int((min_area * np.shape(query)[0]) / 100)
         size = np.shape(query)[0]
         or_matrix = np.log(np.divide(query, reference))
         where_are_NaNs = np.isnan(or_matrix)
@@ -154,25 +165,18 @@ def extract_structures(
             filter2 = filters.threshold_otsu(filter_negative, nbins=size)
             threshold_neg = filter_negative > filter2
 
-        # zoom and rotate 45 degrees
-        zm1 = clipped_zoom(threshold_pos, 0.7)
-        rot1 = ndi.rotate(zm1, 45, reshape=False)
-        zm2 = clipped_zoom(threshold_neg, zoom_factor=0.7)
-        rot2 = ndi.rotate(zm2, 45, reshape=False)
-
         # Close morphology
-        img1 = closing(rot1, square(closing_square))
+        img1 = closing(threshold_pos, square(closing_square))
         label_x1 = label(img1)
-        img2 = closing(rot2, square(closing_square))
+        img2 = closing(threshold_neg, square(closing_square))
         label_x2 = label(img2)
 
-        zm1_reference = clipped_zoom(reference, 0.7)
-        rot_reference = ndi.rotate(zm1_reference, 45, reshape=False)
-        zm1_query = clipped_zoom(query, 0.7)
-        rot_query = ndi.rotate(zm1_query, 45, reshape=False)
+        # get Hi-C bin size / resolution in bp
+        # needed for calculating genomic coordinates from pixel coordinates
+        hic_bin_size = reference_regions[0].end - reference_regions[0].start + 1
 
         # get output (file with label and submatrices)
         pos_query = get_info_feature(
-            label_x1, rot_query, w1, pos_query, area, pair_ix)
+            label_x1, query, gained_features_file, pos_query, query_region, area, pair_ix, hic_bin_size)
         pos_reference = get_info_feature(
-            label_x2, rot_reference, w2, pos_reference, area, pair_ix)
+            label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
