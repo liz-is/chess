@@ -13,7 +13,7 @@ from scipy.ndimage import zoom
 import warnings
 from future.utils import string_types
 from .helpers import (
-    load_regions, load_sparse_matrix, sub_matrix_from_edges_dict
+    load_regions, load_sparse_matrix, sub_matrix_from_edges_dict, GenomicRegion
     )
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
@@ -57,17 +57,17 @@ def clipped_zoom(img, zoom_factor, **kwargs):
 
 
 def get_info_feature(labels, submatrix, outfile, position, region, area, reg, bin_size):
-    for region in regionprops(labels):
-        if region.area > area:
-            minr, minc, maxr, maxc = region.bbox
+    for feature in regionprops(labels):
+        if feature.area > area:
+            minr, minc, maxr, maxc = feature.bbox
             # calculate genomic coordinates
             row_coords = (region.start + (bin_size * minr), region.start + (bin_size * maxr))
             col_coords = (region.start + (bin_size * minc), region.start + (bin_size * maxc))
             chrom = region.chromosome
-            row_region = fanc.GenomicRegion(chromosome=chrom, start=row_coords[0], end=row_coords[1])
-            col_region = fanc.GenomicRegion(chromosome=chrom, start=col_coords[0], end=col_coords[1])
+            row_region = f"{chrom}:{row_coords[0]}-{row_coords[1]}"
+            col_region = f"{chrom}:{col_coords[0]}-{col_coords[1]}"
             # sort genomic coordinates to help with removing duplicates later
-            if row_region.start < col_region.start:
+            if row_coords[0] < col_coords[0]:
                 row_region, col_region = row_region, col_region
             else:
                 row_region, col_region = col_region, row_region
@@ -80,8 +80,8 @@ def get_info_feature(labels, submatrix, outfile, position, region, area, reg, bi
             flat_mat.insert(3, maxc)
             flat_mat.insert(4, minr)
             flat_mat.insert(5, maxr)
-            flat_mat.insert(6, row_region.to_string())
-            flat_mat.insert(7, col_region.to_string())
+            flat_mat.insert(6, row_region)
+            flat_mat.insert(7, col_region)
             outfile.write(','.join(map(str, flat_mat)) + '\n')
             position += 1
     return position
@@ -119,6 +119,9 @@ def extract_structures(
             default_weight=0.)
         area = int((min_area * np.shape(query)[0]) / 100)
         size = np.shape(query)[0]
+
+        # calculate log2 query/reference
+        # does this only work for contact probabilities at the moment?
         or_matrix = np.log(np.divide(query, reference))
         where_are_NaNs = np.isnan(or_matrix)
         or_matrix[where_are_NaNs] = 0.
