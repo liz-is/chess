@@ -117,20 +117,29 @@ def extract_structures(
             query_regions,
             query_region,
             default_weight=0.)
+
+        # it could be helpful to make this a user-defined parameter
+        # maybe as a % of the input matrix area?
+        # would need to be a very low % though, even 1% of area is much higher than the current value
         area = int((min_area * np.shape(query)[0]) / 100)
+
+        # it's not clear to me why matrix dimensions are used to decide how many bins are used for histograms for
+        # denoising / smoothing.
+        # Would default values also be fine?
         size = np.shape(query)[0]
 
         # calculate log2 query/reference
         # does this only work for contact probabilities at the moment?
+        # i.e. Juicer input will give unexpected results with unequal seq depth
+        # I think this only works for query and ref regions that are the same size
+        # is there a check for this?
         or_matrix = np.log(np.divide(query, reference))
         where_are_NaNs = np.isnan(or_matrix)
         or_matrix[where_are_NaNs] = 0.
         or_matrix[or_matrix == -inf] = 0.
         or_matrix[or_matrix == inf] = 0.
         std = np.std(or_matrix)
-        # thres1, thres2 = mean + 0.5 * std, mean - 0.5 * std
-        # positive = np.where(or_matrix > thres1, or_matrix, 0.)
-        # negative = np.where(or_matrix < thres2, or_matrix, 0.)
+
         positive = np.where(or_matrix > (0.5 * std), or_matrix, 0.)
         negative = np.abs(np.where(or_matrix < -(0.5 * std), or_matrix, 0.))
 
@@ -157,12 +166,15 @@ def extract_structures(
 
         # binarise
         if np.all(filter_positive == 0.):
+            # I think the aim of this is to avoid attempting thresholding if all values are the same
+            # so should be `filter_positive`?
             threshold_pos = positive
         else:
             filter1 = filters.threshold_otsu(filter_positive, nbins=size)
             threshold_pos = filter_positive > filter1
 
         if np.all(filter_negative == 0.):
+            # should be `filter_negative`?
             threshold_neg = negative
         else:
             filter2 = filters.threshold_otsu(filter_negative, nbins=size)
@@ -176,6 +188,7 @@ def extract_structures(
 
         # get Hi-C bin size / resolution in bp
         # needed for calculating genomic coordinates from pixel coordinates
+        # is there an easier / more robust way of doing this?
         hic_bin_size = reference_regions[0].end - reference_regions[0].start + 1
 
         # get output (file with label and submatrices)
