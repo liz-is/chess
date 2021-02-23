@@ -17,7 +17,7 @@ from .helpers import (
     )
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
-
+import pandas as pd
 
 def get_sparse_matrix(regions, sparse_matrix):
     '''Get all the sparse HiC matrix from the bed file'''
@@ -56,7 +56,8 @@ def clipped_zoom(img, zoom_factor, **kwargs):
     return out
 
 
-def get_info_feature(labels, submatrix, outfile, position, region, area, reg, bin_size):
+def get_info_feature_square(labels, submatrix, outfile, position, region, area, reg, bin_size):
+    feature_data_list = []
     for feature in regionprops(labels):
         if feature.area > area:
             minr, minc, maxr, maxc = feature.bbox
@@ -73,21 +74,31 @@ def get_info_feature(labels, submatrix, outfile, position, region, area, reg, bi
                 row_region, col_region = col_region, row_region
 
             submat = submatrix[minr:maxr, minc:maxc]
-            flat_mat = list(submat.flatten())
-            flat_mat.insert(0, reg)
-            flat_mat.insert(1, position)
-            flat_mat.insert(2, minc)
-            flat_mat.insert(3, maxc)
-            flat_mat.insert(4, minr)
-            flat_mat.insert(5, maxr)
-            flat_mat.insert(6, row_region)
-            flat_mat.insert(7, col_region)
-            outfile.write(','.join(map(str, flat_mat)) + '\n')
+
+            flat_mat = ";".join(str(x) for x in submat.flatten())
+
+            output_data = {
+                "region_pair_id": reg,
+                "feature_idx": position,
+                "minc": minc,
+                "maxc": maxc,
+                "minr": minr,
+                "maxr": maxr,
+                "row_coords": row_region,
+                "column_coords": col_region,
+                "matrix_data": flat_mat
+            }
+            feature_data_list.append(output_data)
             position += 1
+
+    df = pd.DataFrame(feature_data_list)
+    df = df[-df.duplicated(subset=['row_coords', 'column_coords'])]
+
+    df.to_csv(outfile, mode='a', index=False, header=not path.exists(outfile))
     return position
 
 
-def extract_structures(
+def extract_structures_square(
     reference_edges,
     reference_regions,
     query_edges,
@@ -103,8 +114,8 @@ def extract_structures(
     pos_query = 0
     pos_reference = 0
 
-    gained_features_file = open(path.join(output, 'gained_features.csv'), '+w')
-    lost_features_file = open(path.join(output, 'lost_features.csv'), '+w')
+    gained_features_file = path.join(output, 'gained_features.csv')
+    lost_features_file = path.join(output, 'lost_features.csv')
 
     for pair_ix, reference_region, query_region in pairs:
         reference, ref_rs = sub_matrix_from_edges_dict(
