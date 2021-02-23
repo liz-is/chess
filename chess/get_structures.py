@@ -12,6 +12,7 @@ from numpy import inf
 from scipy.ndimage import zoom
 import warnings
 from future.utils import string_types
+import pandas as pd
 from .helpers import (
     load_regions, load_sparse_matrix, sub_matrix_from_edges_dict
     )
@@ -57,6 +58,7 @@ def clipped_zoom(img, zoom_factor, **kwargs):
 
 
 def get_info_feature(labels, submatrix, outfile, position, area, reg):
+    feature_data_list = []
     for region in regionprops(labels):
         minr, minc, maxr, maxc = region.bbox
         if region.area > area:
@@ -65,15 +67,23 @@ def get_info_feature(labels, submatrix, outfile, position, area, reg):
             y_min, y_max = np.min(by), np.max(by)
             x_min, x_max = np.min(bx), np.max(bx)
             submat = submatrix[y_min:y_max, x_min:x_max]
-            flat_mat = list(submat.flatten())
-            flat_mat.insert(0, reg)
-            flat_mat.insert(1, position)
-            flat_mat.insert(2, x_min)
-            flat_mat.insert(3, x_max)
-            flat_mat.insert(4, y_min)
-            flat_mat.insert(5, y_max)
-            outfile.write(','.join(map(str, flat_mat)) + '\n')
+
+            flat_mat = ";".join(str(x) for x in submat.flatten())
+
+            output_data = {
+                "region_pair_id": reg,
+                "feature_idx": position,
+                "minc": x_min,
+                "maxc": x_max,
+                "minr": y_min,
+                "maxr": y_max,
+                "matrix_data": flat_mat
+            }
+            feature_data_list.append(output_data)
             position += 1
+
+    df = pd.DataFrame(feature_data_list)
+    df.to_csv(outfile, mode='a', index=False, header=not path.exists(outfile))
     return position
 
 
@@ -92,8 +102,8 @@ def extract_structures(
     pos_query = 0
     pos_reference = 0
 
-    w1 = open(path.join(output, 'gained_features.tsv'), '+w')
-    w2 = open(path.join(output, 'lost_features.tsv'), '+w')
+    w1 = path.join(output, 'gained_features.csv')
+    w2 = path.join(output, 'lost_features.csv')
 
     for pair_ix, reference_region, query_region in pairs:
         reference, ref_rs = sub_matrix_from_edges_dict(
