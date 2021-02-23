@@ -558,6 +558,7 @@ class Chess(object):
             'Applying image filtering to identify specific structures')
 
         if args.extract_coords:
+            logger.info('Using experimental genomic coordinate extraction approach!')
             # get Hi-C bin size / resolution in bp
             # needed for calculating genomic coordinates from pixel coordinates
             # is there an easier / more robust way of doing this?
