@@ -63,6 +63,7 @@ def extract_structures_square(
     reference_regions,
     query_edges,
     query_regions,
+    hic_bin_size,
     pairs,
     output,
     windowsize,
@@ -156,11 +157,6 @@ def extract_structures_square(
         label_x1 = label(img1)
         img2 = closing(threshold_neg, square(closing_square))
         label_x2 = label(img2)
-
-        # get Hi-C bin size / resolution in bp
-        # needed for calculating genomic coordinates from pixel coordinates
-        # is there an easier / more robust way of doing this?
-        hic_bin_size = reference_regions[0].end - reference_regions[0].start + 1
 
         # get output (file with label and submatrices)
         pos_query = get_info_feature_square(
