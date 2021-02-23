@@ -556,16 +556,35 @@ class Chess(object):
         pairs = list(load_pairs_iter(pairs_file))
         logger.info(
             'Applying image filtering to identify specific structures')
-        extract_structures(
-            reference_edges,
-            reference_region_trees,
-            query_edges,
-            query_region_trees,
-            pairs, output_dir,
-            args.windowsize,
-            args.sigma_spatial,
-            args.size_medianfilter,
-            args.closing_square)
+
+        if args.extract_coords:
+            # get Hi-C bin size / resolution in bp
+            # needed for calculating genomic coordinates from pixel coordinates
+            # is there an easier / more robust way of doing this?
+            hic_bin_size = reference_regions[0].end - reference_regions[0].start + 1
+            extract_structures_square(
+                reference_edges,
+                reference_region_trees,
+                query_edges,
+                query_region_trees,
+                hic_bin_size,
+                pairs, output_dir,
+                args.windowsize,
+                args.sigma_spatial,
+                args.size_medianfilter,
+                args.closing_square,
+                )
+        else:
+            extract_structures(
+                reference_edges,
+                reference_region_trees,
+                query_edges,
+                query_region_trees,
+                pairs, output_dir,
+                args.windowsize,
+                args.sigma_spatial,
+                args.size_medianfilter,
+                args.closing_square)
         logger.info('Results collected')
 
     def crosscorrelate(self, argv):

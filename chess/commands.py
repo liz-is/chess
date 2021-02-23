@@ -11,7 +11,7 @@ def chess_parser():
             sim             Calculate structural similarity
             oe              Transform a Hi-C matrix to an observed/expected matrix
             pairs           Make window pairs for chess genome scan
-            background   Generate background region BED files
+            background      Generate background region BED files
             extract         Extract specific regions that are significantly different
             crosscorrelate  Get structural clusters from the extracted submatrices
 
@@ -391,6 +391,18 @@ def extract_parser():
              'and fill structures. '
              'Larger values will enclose larger structures and remove '
              'punctuate or looping structures.')
+
+    parser.add_argument(
+        '--extract-coords',
+        dest="extract_coords",
+        action='store_true',
+        help='NOTE: experimental feature! Enable this option to use an experimental version of `chess extract` '
+             'that returns genomic coordinates of extracted features.'
+             'Default is to extract features from rotated matrices and return 7-column output files. Enabling '
+             'this option will extract features from unrotated matrices and return 9-column output files. Note '
+             'that the features returned will NOT be the same between these two approaches, and the optimal values '
+             'of other `chess extract` parameters may differ. '
+    )
 
     return parser
 
