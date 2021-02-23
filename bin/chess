@@ -523,6 +523,7 @@ class Chess(object):
         from chess.helpers import load_pairs_iter, load_oe_contacts
 
         from chess.get_structures import extract_structures
+        from chess.get_structures_square import extract_structures_square
 
         output_dir = args.out
         if not os.path.exists(output_dir):
