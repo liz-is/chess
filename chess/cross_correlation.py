@@ -27,14 +27,29 @@ def correlate2d(file, output_folder, pairs):
         pairs_dict[pair_ix] = str(reference_region)+'-'+str(query_region)
 
     # load features
-    df = pd.read_csv(file).set_index('feature_idx')
-    df['height'] = df['maxc'] - df['minc']
-    df['width'] = df['maxr'] - df['minr']
-    all_arrays = {feature_id: np.asfarray(matrix_data.split(';')).reshape(height, width) for
-                  (feature_id, matrix_data, height, width) in
-                  zip(df.index, df['matrix_data'], df['height'], df['width'])}
-    information_regions = {feature_id: (pair_id, feature_id) for (feature_id, pair_id) in
-                           zip(df.index, df['region_pair_id'])}
+    df = pd.read_csv(file, nrows=1)
+    if len(df.columns) > 9:
+        all_arrays = defaultdict(list)
+        information_regions = defaultdict(list)
+        with open(file, 'r') as r:
+            for line in r:
+                region, position, x_min, x_max, y_min, y_max = line.split(',')[:6]
+                pair_id = pairs_dict[int(region)]
+                line_float = [float(x) for x in line.split(',')[6:]]
+                height, width = int(y_max) - int(y_min), int(x_max) - int(x_min)
+                mat = np.asanyarray(line_float).reshape(int(height), int(width))
+                all_arrays[int(position)].append(mat)
+                information_regions[int(position)].append((pair_id, int(position)))
+
+    else:
+        df = pd.read_csv(file).set_index('feature_idx')
+        df['height'] = df['maxc'] - df['minc']
+        df['width'] = df['maxr'] - df['minr']
+        all_arrays = {feature_id: np.asfarray(matrix_data.split(';')).reshape(height, width) for
+                      (feature_id, matrix_data, height, width) in
+                      zip(df.index, df['matrix_data'], df['height'], df['width'])}
+        information_regions = {feature_id: (pair_id, feature_id) for (feature_id, pair_id) in
+                               zip(df.index, df['region_pair_id'])}
 
     logger.info(
         '[MAIN]: All submatrices loaded, starting 2D cross-correlation')
