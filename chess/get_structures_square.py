@@ -70,7 +70,8 @@ def extract_structures_square(
     sigma_spatial,
     size_medianfilter,
     closing_square,
-    min_area=5
+    min_area=5,
+    plot=None
 ):
     pos_query = 0
     pos_reference = 0
@@ -78,88 +79,142 @@ def extract_structures_square(
     gained_features_file = path.join(output, 'gained_features.csv')
     lost_features_file = path.join(output, 'lost_features.csv')
 
-    for pair_ix, reference_region, query_region in pairs:
-        reference, ref_rs = sub_matrix_from_edges_dict(
-            reference_edges,
-            reference_regions,
-            reference_region,
-            default_weight=0.)
-        query, qry_rs = sub_matrix_from_edges_dict(
-            query_edges,
-            query_regions,
-            query_region,
-            default_weight=0.)
+    plot_file = None
+    if plot is not None:
+        from matplotlib.backends.backend_pdf import PdfPages
+        plot_file = PdfPages(plot)
 
-        # it could be helpful to make this a user-defined parameter
-        # maybe as a % of the input matrix area?
-        # would need to be a very low % though, even 1% of area is much higher than the current value
-        area = int((min_area * np.shape(query)[0]) / 100)
+    try:
+        for pair_ix, reference_region, query_region in pairs:
+            reference, ref_rs = sub_matrix_from_edges_dict(
+                reference_edges,
+                reference_regions,
+                reference_region,
+                default_weight=0.)
+            query, qry_rs = sub_matrix_from_edges_dict(
+                query_edges,
+                query_regions,
+                query_region,
+                default_weight=0.)
 
-        # it's not clear to me why matrix dimensions are used to decide how many bins are used for histograms for
-        # denoising / smoothing.
-        # Would default values also be fine?
-        size = np.shape(query)[0]
+            # it could be helpful to make this a user-defined parameter
+            # maybe as a % of the input matrix area?
+            # would need to be a very low % though, even 1% of area is much higher than the current value
+            area = int((min_area * np.shape(query)[0]) / 100)
 
-        # calculate log2 query/reference
-        # does this only work for contact probabilities at the moment?
-        # i.e. Juicer input will give unexpected results with unequal seq depth
-        # I think this only works for query and ref regions that are the same size
-        # is there a check for this?
-        or_matrix = np.log(np.divide(query, reference))
-        where_are_NaNs = np.isnan(or_matrix)
-        or_matrix[where_are_NaNs] = 0.
-        or_matrix[or_matrix == -inf] = 0.
-        or_matrix[or_matrix == inf] = 0.
-        std = np.std(or_matrix)
+            # it's not clear to me why matrix dimensions are used to decide how many bins are used for histograms for
+            # denoising / smoothing.
+            # Would default values also be fine?
+            size = np.shape(query)[0]
 
-        positive = np.where(or_matrix > (0.5 * std), or_matrix, 0.)
-        negative = np.abs(np.where(or_matrix < -(0.5 * std), or_matrix, 0.))
+            # calculate log2 query/reference
+            # does this only work for contact probabilities at the moment?
+            # i.e. Juicer input will give unexpected results with unequal seq depth
+            # I think this only works for query and ref regions that are the same size
+            # is there a check for this?
+            or_matrix = np.log(np.divide(query, reference))
+            where_are_NaNs = np.isnan(or_matrix)
+            or_matrix[where_are_NaNs] = 0.
+            or_matrix[or_matrix == -inf] = 0.
+            or_matrix[or_matrix == inf] = 0.
+            std = np.std(or_matrix)
 
-        # denoise
-        denoise_positive = restoration.denoise_bilateral(
-            positive,
-            sigma_color=np.mean(positive),
-            win_size=windowsize,
-            sigma_spatial=sigma_spatial,
-            bins=size,
-            multichannel=False)
-        denoise_negative = restoration.denoise_bilateral(
-            negative,
-            sigma_color=np.mean(negative),
-            win_size=windowsize,
-            sigma_spatial=sigma_spatial,
-            bins=size,
-            multichannel=False)
-        # smooth
-        filter_positive = ndi.median_filter(
-            denoise_positive, size_medianfilter)
-        filter_negative = ndi.median_filter(
-            denoise_negative, size_medianfilter)
+            positive = np.where(or_matrix > (0.5 * std), or_matrix, 0.)
+            negative = np.abs(np.where(or_matrix < -(0.5 * std), or_matrix, 0.))
 
-        # binarise
-        if np.all(filter_positive == 0.):
-            # I think the aim of this is to avoid attempting thresholding if all values are the same
-            # so should be `filter_positive`?
-            threshold_pos = positive
-        else:
-            filter1 = filters.threshold_otsu(filter_positive, nbins=size)
-            threshold_pos = filter_positive > filter1
+            # denoise
+            denoise_positive = restoration.denoise_bilateral(
+                positive,
+                sigma_color=np.mean(positive),
+                win_size=windowsize,
+                sigma_spatial=sigma_spatial,
+                bins=size,
+                multichannel=False)
+            denoise_negative = restoration.denoise_bilateral(
+                negative,
+                sigma_color=np.mean(negative),
+                win_size=windowsize,
+                sigma_spatial=sigma_spatial,
+                bins=size,
+                multichannel=False)
+            # smooth
+            filter_positive = ndi.median_filter(
+                denoise_positive, size_medianfilter)
+            filter_negative = ndi.median_filter(
+                denoise_negative, size_medianfilter)
 
-        if np.all(filter_negative == 0.):
-            # should be `filter_negative`?
-            threshold_neg = negative
-        else:
-            filter2 = filters.threshold_otsu(filter_negative, nbins=size)
-            threshold_neg = filter_negative > filter2
+            # binarise
+            if np.all(filter_positive == 0.):
+                # I think the aim of this is to avoid attempting thresholding if all values are the same
+                # so should be `filter_positive`?
+                threshold_pos = positive
+            else:
+                filter1 = filters.threshold_otsu(filter_positive, nbins=size)
+                threshold_pos = filter_positive > filter1
 
-        # Close morphology
-        img1 = closing(threshold_pos, square(closing_square))
-        label_x1 = label(img1)
-        img2 = closing(threshold_neg, square(closing_square))
-        label_x2 = label(img2)
+            if np.all(filter_negative == 0.):
+                # should be `filter_negative`?
+                threshold_neg = negative
+            else:
+                filter2 = filters.threshold_otsu(filter_negative, nbins=size)
+                threshold_neg = filter_negative > filter2
 
-        # get output (file with label and submatrices)
-        pos_query = get_info_feature_square(
-            label_x1, query, gained_features_file, pos_query, query_region, area, pair_ix, hic_bin_size)
-        pos_reference = get_info_feature_square(
-            label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
+            # Close morphology
+            img1 = closing(threshold_pos, square(closing_square))
+            label_x1 = label(img1)
+            img2 = closing(threshold_neg, square(closing_square))
+            label_x2 = label(img2)
+
+            # get output (file with label and submatrices)
+            pos_query = get_info_feature_square(
+                label_x1, query, gained_features_file, pos_query, query_region, area, pair_ix, hic_bin_size)
+            pos_reference = get_info_feature_square(
+                label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
+
+            if plot_file is not None:
+                plot_features(plot_file, reference, query, label_x1, label_x2, cmap='germany')
+
+    finally:
+        if plot_file is not None:
+            plot_file.close()
+
+
+def plot_features(plot_file, reference, query, label_x1, label_x2, area,
+                  cmap, linecolor='royalblue', vmin=1e-3, vmax=1e-1):
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from matplotlib.colors import LogNorm
+    import fanc.plotting
+    # for colormap only, need to replace this!
+
+    fig, (ax1, ax2) = plt.subplots(figsize=(10, 6), ncols=2)
+    ax1.imshow(reference, norm=LogNorm(vmin=vmin, vmax=vmax), cmap=cmap)
+
+    # higher in ref
+    for feature in regionprops(label_x2):
+        # take regions with large enough areas
+        if feature.area >= area:
+            # draw rectangle around segmented coins
+            minr, minc, maxr, maxc = feature.bbox
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
+                                      fill=False, edgecolor=linecolor, linewidth=2)
+            ax1.add_patch(rect)
+    ax1.set_axis_off()
+
+    ax2.imshow(query, norm=LogNorm(vmin=vmin, vmax=vmax), cmap=cmap)
+
+    # higher in query
+    for feature in regionprops(label_x1):
+        # take regions with large enough areas
+        if feature.area >= area:
+            # draw rectangle around segmented coins
+            minr, minc, maxr, maxc = feature.bbox
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
+                                      fill=False, edgecolor=linecolor, linewidth=2)
+            ax2.add_patch(rect)
+
+    ax2.set_axis_off()
+    ax1.set_title('reference')
+    ax2.set_title('query')
+    plt.tight_layout()
+    plot_file.savefig()
