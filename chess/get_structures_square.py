@@ -102,11 +102,6 @@ def extract_structures_square(
             # would need to be a very low % though, even 1% of area is much higher than the current value
             area = int((min_area * np.shape(query)[0]) / 100)
 
-            # it's not clear to me why matrix dimensions are used to decide how many bins are used for histograms for
-            # denoising / smoothing.
-            # Would default values also be fine?
-            size = np.shape(query)[0]
-
             # calculate log2 query/reference
             # does this only work for contact probabilities at the moment?
             # i.e. Juicer input will give unexpected results with unequal seq depth
@@ -128,14 +123,12 @@ def extract_structures_square(
                 sigma_color=np.mean(positive),
                 win_size=windowsize,
                 sigma_spatial=sigma_spatial,
-                bins=size,
                 multichannel=False)
             denoise_negative = restoration.denoise_bilateral(
                 negative,
                 sigma_color=np.mean(negative),
                 win_size=windowsize,
                 sigma_spatial=sigma_spatial,
-                bins=size,
                 multichannel=False)
             # smooth
             filter_positive = ndi.median_filter(
@@ -145,18 +138,15 @@ def extract_structures_square(
 
             # binarise
             if np.all(filter_positive == 0.):
-                # I think the aim of this is to avoid attempting thresholding if all values are the same
-                # so should be `filter_positive`?
-                threshold_pos = positive
+                threshold_pos = filter_positive
             else:
-                filter1 = filters.threshold_otsu(filter_positive, nbins=size)
+                filter1 = filters.threshold_otsu(filter_positive)
                 threshold_pos = filter_positive > filter1
 
             if np.all(filter_negative == 0.):
-                # should be `filter_negative`?
-                threshold_neg = negative
+                threshold_neg = filter_negative
             else:
-                filter2 = filters.threshold_otsu(filter_negative, nbins=size)
+                filter2 = filters.threshold_otsu(filter_negative)
                 threshold_neg = filter_negative > filter2
 
             # Close morphology
