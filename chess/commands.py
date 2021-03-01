@@ -404,6 +404,14 @@ def extract_parser():
              'of other `chess extract` parameters may differ. '
     )
 
+    parser.add_argument(
+        '--plot',
+        dest="plot",
+        help='File name to save plots as pdf if you wish to plot each region with extracted features highlighted. '
+             'Currently only works with experimental --extract-coords option. It is not yet possible to control '
+             'plotting parameters (colour map, etc) from the command line.'
+    )
+
     return parser
 
 

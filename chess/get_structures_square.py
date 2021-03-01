@@ -172,7 +172,7 @@ def extract_structures_square(
                 label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
 
             if plot_file is not None:
-                plot_features(plot_file, reference, query, label_x1, label_x2, cmap='germany',
+                plot_features(plot_file, reference, query, label_x1, label_x2, area, cmap='germany',
                               reference_region=str(reference_region), query_region=str(query_region))
 
     finally:

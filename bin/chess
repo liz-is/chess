@@ -574,7 +574,8 @@ class Chess(object):
                 args.sigma_spatial,
                 args.size_medianfilter,
                 args.closing_square,
-                )
+                plot=args.plot
+            )
         else:
             extract_structures(
                 reference_edges,
