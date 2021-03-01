@@ -172,7 +172,8 @@ def extract_structures_square(
                 label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
 
             if plot_file is not None:
-                plot_features(plot_file, reference, query, label_x1, label_x2, cmap='germany')
+                plot_features(plot_file, reference, query, label_x1, label_x2, cmap='germany',
+                              reference_region=str(reference_region), query_region=str(query_region))
 
     finally:
         if plot_file is not None:
@@ -180,7 +181,8 @@ def extract_structures_square(
 
 
 def plot_features(plot_file, reference, query, label_x1, label_x2, area,
-                  cmap, linecolor='royalblue', vmin=1e-3, vmax=1e-1):
+                  cmap, linecolor='royalblue', vmin=1e-3, vmax=1e-1,
+                  reference_region='', query_region=''):
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
     from matplotlib.colors import LogNorm
@@ -214,7 +216,7 @@ def plot_features(plot_file, reference, query, label_x1, label_x2, area,
             ax2.add_patch(rect)
 
     ax2.set_axis_off()
-    ax1.set_title('reference')
-    ax2.set_title('query')
+    ax1.set_title('reference' + ' ' + reference_region)
+    ax2.set_title('query' + ' ' + query_region)
     plt.tight_layout()
     plot_file.savefig()
