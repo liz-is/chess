@@ -162,7 +162,7 @@ def extract_structures_square(
                 label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
 
             if plot_file is not None:
-                plot_features(plot_file, reference, query, label_x1, label_x2, area, cmap='germany',
+                plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, area, cmap='germany',
                               reference_region=str(reference_region), query_region=str(query_region))
 
     finally:
@@ -170,7 +170,7 @@ def extract_structures_square(
             plot_file.close()
 
 
-def plot_features(plot_file, reference, query, label_x1, label_x2, area,
+def plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, area,
                   cmap, linecolor='royalblue', vmin=1e-3, vmax=1e-1,
                   reference_region='', query_region=''):
     import matplotlib.pyplot as plt
@@ -179,7 +179,7 @@ def plot_features(plot_file, reference, query, label_x1, label_x2, area,
     import fanc.plotting
     # for colormap only, need to replace this!
 
-    fig, (ax1, ax2) = plt.subplots(figsize=(10, 6), ncols=2)
+    fig, (ax1, ax2, ax3) = plt.subplots(figsize=(12, 5), ncols=3)
     ax1.imshow(reference, norm=LogNorm(vmin=vmin, vmax=vmax), cmap=cmap)
 
     # higher in ref
@@ -204,9 +204,13 @@ def plot_features(plot_file, reference, query, label_x1, label_x2, area,
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
                                       fill=False, edgecolor=linecolor, linewidth=2)
             ax2.add_patch(rect)
-
     ax2.set_axis_off()
+
+    ax3.imshow(or_matrix, cmap="RdBu_r", vmax=1, vmin=-1)
+    ax3.set_axis_off()
+
     ax1.set_title('reference' + ' ' + reference_region)
     ax2.set_title('query' + ' ' + query_region)
+    ax3.set_title('query / reference')
     plt.tight_layout()
     plot_file.savefig()
