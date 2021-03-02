@@ -23,13 +23,6 @@ def chess_parser():
     )
 
     parser.add_argument(
-        '--version', dest='print_version',
-        action='store_true',
-        help='Print version information'
-    )
-    parser.set_defaults(print_version=False)
-
-    parser.add_argument(
         '--verbose', '-v', dest='verbosity',
         action='count',
         default=0,
