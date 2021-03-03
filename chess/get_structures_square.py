@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from os import path
+import os
 import logging
 import numpy as np
 from scipy import ndimage as ndi
@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
 
-def get_info_feature_square(labels, submatrix, outfile, position, region, area, reg, bin_size):
+def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, region, area, reg, bin_size):
     feature_data_list = []
     for feature in regionprops(labels):
         if feature.area > area:
@@ -34,6 +34,7 @@ def get_info_feature_square(labels, submatrix, outfile, position, region, area, 
                 row_region, col_region = col_region, row_region
 
             submat = submatrix[minr:maxr, minc:maxc]
+            mean_fc = np.mean(fc_matrix[minr:maxr, minc:maxc])
 
             flat_mat = ";".join(str(x) for x in submat.flatten())
 
@@ -46,6 +47,7 @@ def get_info_feature_square(labels, submatrix, outfile, position, region, area, 
                 "maxr": maxr,
                 "row_coords": row_region,
                 "column_coords": col_region,
+                "mean_query_ref_foldchange": mean_fc,
                 "matrix_data": flat_mat
             }
             feature_data_list.append(output_data)
@@ -54,7 +56,7 @@ def get_info_feature_square(labels, submatrix, outfile, position, region, area, 
     df = pd.DataFrame(feature_data_list)
     df = df[-df.duplicated(subset=['row_coords', 'column_coords'])]
 
-    df.to_csv(outfile, mode='a', index=False, header=not path.exists(outfile))
+    df.to_csv(outfile, mode='a', index=False, header=not os.path.exists(outfile))
     return position
 
 
@@ -76,8 +78,14 @@ def extract_structures_square(
     pos_query = 0
     pos_reference = 0
 
-    gained_features_file = path.join(output, 'gained_features.csv')
-    lost_features_file = path.join(output, 'lost_features.csv')
+    gained_features_file = os.path.join(output, 'gained_features.csv')
+    if os.path.exists(gained_features_file):
+        logger.warning(f'Output file {gained_features_file} already exists and will be overwritten!')
+        os.remove(gained_features_file)
+    lost_features_file = os.path.join(output, 'lost_features.csv')
+    if os.path.exists(lost_features_file):
+        logger.warning(f'Output file {lost_features_file} already exists and will be overwritten!')
+        os.remove(lost_features_file)
 
     plot_file = None
     if plot is not None:
@@ -157,9 +165,11 @@ def extract_structures_square(
 
             # get output (file with label and submatrices)
             pos_query = get_info_feature_square(
-                label_x1, query, gained_features_file, pos_query, query_region, area, pair_ix, hic_bin_size)
+                label_x1, query, or_matrix, gained_features_file, pos_query,
+                query_region, area, pair_ix, hic_bin_size)
             pos_reference = get_info_feature_square(
-                label_x2, reference, lost_features_file, pos_reference, reference_region, area, pair_ix, hic_bin_size)
+                label_x2, reference, or_matrix, lost_features_file, pos_reference,
+                reference_region, area, pair_ix, hic_bin_size)
 
             if plot_file is not None:
                 plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, area, cmap='germany',

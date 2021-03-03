@@ -28,7 +28,7 @@ def correlate2d(file, output_folder, pairs):
 
     # load features
     df = pd.read_csv(file, nrows=1)
-    if len(df.columns) > 9:
+    if len(df.columns) > 10:
         all_arrays = defaultdict(lambda: np.ndarray(0))
         information_regions = defaultdict(tuple)
         with open(file, 'r') as r:
