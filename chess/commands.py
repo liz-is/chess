@@ -406,6 +406,17 @@ def extract_parser():
     )
 
     parser.add_argument(
+        '--min-feature-size',
+        dest='min_feature_size',
+        type=int,
+        default=3,
+        help='Minimum size of features to return, in pixels (i.e. number of Hi-C bins). Currently only works with '
+             'experimental --extract-coords option. Only features where both height and width of the bounding box '
+             'of the feature are at least this many pixels will be returned.'
+
+    )
+
+    parser.add_argument(
         '--plot',
         dest="plot",
         help='File name to save plots as pdf if you wish to plot each region with extracted features highlighted. '

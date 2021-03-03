@@ -574,6 +574,7 @@ class Chess(object):
                 args.sigma_spatial,
                 args.size_medianfilter,
                 args.closing_square,
+                args.min_feature_size,
                 plot=args.plot
             )
         else:

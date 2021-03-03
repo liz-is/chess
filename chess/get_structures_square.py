@@ -16,11 +16,13 @@ warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
 
-def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, region, area, reg, bin_size):
+def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, region, min_feature_size, reg, bin_size):
     feature_data_list = []
     for feature in regionprops(labels):
-        if feature.area > area:
-            minr, minc, maxr, maxc = feature.bbox
+        minr, minc, maxr, maxc = feature.bbox
+        # calculate bbox edge size in pixels
+        # if shortest side is less than min_feature_size, skip this region
+        if min(maxc - minc, maxr - minr) >= min_feature_size:
             # calculate genomic coordinates
             row_coords = (region.start + (bin_size * minr), region.start + (bin_size * maxr))
             col_coords = (region.start + (bin_size * minc), region.start + (bin_size * maxc))
@@ -28,9 +30,7 @@ def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, reg
             row_region = f"{chrom}:{row_coords[0]}-{row_coords[1]}"
             col_region = f"{chrom}:{col_coords[0]}-{col_coords[1]}"
             # sort genomic coordinates to help with removing duplicates later
-            if row_coords[0] < col_coords[0]:
-                row_region, col_region = row_region, col_region
-            else:
+            if row_coords[0] > col_coords[0]:
                 row_region, col_region = col_region, row_region
 
             submat = submatrix[minr:maxr, minc:maxc]
@@ -72,7 +72,7 @@ def extract_structures_square(
     sigma_spatial,
     size_medianfilter,
     closing_square,
-    min_area=5,
+    min_feature_size,
     plot=None
 ):
     pos_query = 0
@@ -104,11 +104,6 @@ def extract_structures_square(
                 query_regions,
                 query_region,
                 default_weight=0.)
-
-            # it could be helpful to make this a user-defined parameter
-            # maybe as a % of the input matrix area?
-            # would need to be a very low % though, even 1% of area is much higher than the current value
-            area = int((min_area * np.shape(query)[0]) / 100)
 
             # calculate log2 query/reference
             # does this only work for contact probabilities at the moment?
@@ -166,14 +161,14 @@ def extract_structures_square(
             # get output (file with label and submatrices)
             pos_query = get_info_feature_square(
                 label_x1, query, or_matrix, gained_features_file, pos_query,
-                query_region, area, pair_ix, hic_bin_size)
+                query_region, min_feature_size, pair_ix, hic_bin_size)
             pos_reference = get_info_feature_square(
                 label_x2, reference, or_matrix, lost_features_file, pos_reference,
-                reference_region, area, pair_ix, hic_bin_size)
+                reference_region, min_feature_size, pair_ix, hic_bin_size)
 
             if plot_file is not None:
-                plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, area, cmap='germany',
-                              reference_region=str(reference_region), query_region=str(query_region))
+                plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, min_feature_size,
+                              cmap='germany', reference_region=str(reference_region), query_region=str(query_region))
 
     finally:
         if plot_file is not None:
