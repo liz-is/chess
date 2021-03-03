@@ -29,17 +29,17 @@ def correlate2d(file, output_folder, pairs):
     # load features
     df = pd.read_csv(file, nrows=1)
     if len(df.columns) > 9:
-        all_arrays = defaultdict(list)
-        information_regions = defaultdict(list)
+        all_arrays = defaultdict(lambda: np.ndarray(0))
+        information_regions = defaultdict(tuple)
         with open(file, 'r') as r:
             for line in r:
                 region, position, x_min, x_max, y_min, y_max = line.split(',')[:6]
-                pair_id = pairs_dict[int(region)]
+                pair_id = pairs_dict[region]
                 line_float = [float(x) for x in line.split(',')[6:]]
                 height, width = int(y_max) - int(y_min), int(x_max) - int(x_min)
                 mat = np.asanyarray(line_float).reshape(int(height), int(width))
-                all_arrays[int(position)].append(mat)
-                information_regions[int(position)].append((pair_id, int(position)))
+                all_arrays[position] = mat
+                information_regions[position] = (pair_id, position)
 
     else:
         df = pd.read_csv(file).set_index('feature_idx')
@@ -54,13 +54,14 @@ def correlate2d(file, output_folder, pairs):
     logger.info(
         '[MAIN]: All submatrices loaded, starting 2D cross-correlation')
 
+    feature_ids = information_regions.keys()
     tag = file.split('/')[-1].split('_')[0]
     # calculate correlations
     correlation_dataframe = pd.DataFrame(
-        index=df.index,
-        columns=df.index
+        index=feature_ids,
+        columns=feature_ids
     )
-    for a, b in tqdm(itertools.combinations(df.index, 2)):
+    for a, b in tqdm(itertools.combinations(feature_ids, 2)):
         c11 = c2d(all_arrays[a], all_arrays[b], mode='same')
         c112 = c2d(all_arrays[b], all_arrays[a], mode='same')
         transp1 = c2d(np.fliplr(all_arrays[a]), all_arrays[b], mode='same')
@@ -79,7 +80,7 @@ def correlate2d(file, output_folder, pairs):
         path.join(output_folder, 'correlation_dataframe_%s.csv' % (tag)))
 
     sum_of_squared_distances = []
-    K = range(1, min(scaled.shape[0], 15))
+    K = range(1, min(scaled.shape[0]+1, 15))
     for k in K:
         km = KMeans(n_clusters=k)
         km = km.fit(scaled)
@@ -113,6 +114,6 @@ def correlate2d(file, output_folder, pairs):
         'subregions_%s_clusters_%s.tsv' % (str(optimal_number_clusters), tag)),
         'a+')
     for n, i in enumerate(list(kmeans.labels_)):
-        t1, t2 = information_regions[n][0]
-        w.write('{}\t{}\t{}\n'.format('Cluster ' + str(i), t1, t2))
+        region_pair_info, feature_id = information_regions[n]
+        w.write('{}\t{}\t{}\n'.format('Cluster ' + str(i), region_pair_info, feature_id))
     w.close()
