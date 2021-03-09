@@ -53,7 +53,9 @@ def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, reg
             feature_data_list.append(output_data)
             position += 1
 
-    df = pd.DataFrame(feature_data_list)
+    df = pd.DataFrame(feature_data_list, columns = ["region_pair_id", "feature_idx", "minc", "maxc", "minr", "maxr",
+                                                    "row_coords", "column_coords", "mean_query_ref_foldchange",
+                                                    "matrix_data"])
     df = df[-df.duplicated(subset=['row_coords', 'column_coords'])]
 
     df.to_csv(outfile, mode='a', index=False, header=not os.path.exists(outfile))
@@ -175,7 +177,7 @@ def extract_structures_square(
             plot_file.close()
 
 
-def plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, area,
+def plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, min_feature_size,
                   cmap, linecolor='royalblue', vmin=1e-3, vmax=1e-1,
                   reference_region='', query_region=''):
     import matplotlib.pyplot as plt
@@ -190,9 +192,11 @@ def plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, ar
     # higher in ref
     for feature in regionprops(label_x2):
         # take regions with large enough areas
-        if feature.area >= area:
+        minr, minc, maxr, maxc = feature.bbox
+        # calculate bbox edge size in pixels
+        # if shortest side is less than min_feature_size, skip this region
+        if min(maxc - minc, maxr - minr) >= min_feature_size:
             # draw rectangle around segmented coins
-            minr, minc, maxr, maxc = feature.bbox
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
                                       fill=False, edgecolor=linecolor, linewidth=2)
             ax1.add_patch(rect)
@@ -203,9 +207,11 @@ def plot_features(plot_file, reference, query, or_matrix, label_x1, label_x2, ar
     # higher in query
     for feature in regionprops(label_x1):
         # take regions with large enough areas
-        if feature.area >= area:
+        minr, minc, maxr, maxc = feature.bbox
+        # calculate bbox edge size in pixels
+        # if shortest side is less than min_feature_size, skip this region
+        if min(maxc - minc, maxr - minr) >= min_feature_size:
             # draw rectangle around segmented coins
-            minr, minc, maxr, maxc = feature.bbox
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
                                       fill=False, edgecolor=linecolor, linewidth=2)
             ax2.add_patch(rect)
