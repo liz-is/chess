@@ -156,7 +156,7 @@ def extract_structures_square(
             if np.all(filter_negative == 0.):
                 threshold_neg = filter_negative
             else:
-                filter_positive[lower_tri_idx] = 0.
+                filter_negative[lower_tri_idx] = 0.
                 filter2 = filters.threshold_otsu(filter_negative)
                 threshold_neg = filter_negative > filter2
 
