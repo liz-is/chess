@@ -56,6 +56,7 @@ def get_info_feature_square(labels, submatrix, fc_matrix, outfile, position, reg
     df = pd.DataFrame(feature_data_list, columns = ["region_pair_id", "feature_idx", "minc", "maxc", "minr", "maxr",
                                                     "row_coords", "column_coords", "mean_query_ref_foldchange",
                                                     "matrix_data"])
+    # probably not needed any more because lower triangle is masked
     df = df[-df.duplicated(subset=['row_coords', 'column_coords'])]
 
     df.to_csv(outfile, mode='a', index=False, header=not os.path.exists(outfile))
@@ -141,16 +142,21 @@ def extract_structures_square(
             filter_negative = ndi.median_filter(
                 denoise_negative, size_medianfilter)
 
+            # to mask lower triangle
+            lower_tri_idx = np.tril_indices(filter_positive.shape[0], 1)
+
             # binarise
             if np.all(filter_positive == 0.):
                 threshold_pos = filter_positive
             else:
+                filter_positive[lower_tri_idx] = 0.
                 filter1 = filters.threshold_otsu(filter_positive)
                 threshold_pos = filter_positive > filter1
 
             if np.all(filter_negative == 0.):
                 threshold_neg = filter_negative
             else:
+                filter_positive[lower_tri_idx] = 0.
                 filter2 = filters.threshold_otsu(filter_negative)
                 threshold_neg = filter_negative > filter2
 
